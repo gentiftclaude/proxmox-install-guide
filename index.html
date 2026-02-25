@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Install Proxmox VE — Step by Step</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0d0d0d;
+      --surface: #141414;
+      --surface2: #1a1a1a;
+      --border: #2a2a2a;
+      --amber: #f5a623;
+      --amber-dim: #a06910;
+      --green: #39d353;
+      --red: #ff5f57;
+      --blue: #58a6ff;
+      --text: #e8e8e8;
+      --muted: #666;
+      --code-bg: #111;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.08) 2px,
+        rgba(0,0,0,0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Ambient glow */
+    .glow-orb {
+      position: fixed;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,166,35,0.06) 0%, transparent 70%);
+      top: -200px;
+      right: -200px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Header */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13,13,13,0.92);
+      backdrop-filter: blur(12px);
+    }
+
+    .header-inner {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .logo {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+      text-decoration: none;
+    }
+
+    .logo span { color: var(--muted); }
+
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--green);
+      border: 1px solid rgba(57,211,83,0.3);
+      padding: 3px 10px;
+      border-radius: 2px;
+      letter-spacing: 0.05em;
+    }
+
+    /* Hero */
+    .hero {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 80px 2rem 60px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--amber);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .hero-eyebrow::before {
+      content: '';
+      display: block;
+      width: 32px;
+      height: 1px;
+      background: var(--amber);
+    }
+
+    h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+    }
+
+    h1 .accent { color: var(--amber); }
+
+    .hero-desc {
+      font-size: 1.05rem;
+      color: var(--muted);
+      max-width: 520px;
+      line-height: 1.6;
+      margin-bottom: 40px;
+    }
+
+    .hero-meta {
+      display: flex;
+      gap: 32px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .hero-meta strong { color: var(--text); }
+
+    /* Progress bar */
+    .progress-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 2px;
+      background: var(--amber);
+      z-index: 9998;
+      width: 0%;
+      transition: width 0.1s;
+      box-shadow: 0 0 8px var(--amber);
+    }
+
+    /* Divider */
+    .divider {
+      max-width: 900px;
+      margin: 0 auto 60px;
+      padding: 0 2rem;
+    }
+    .divider hr {
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Steps */
+    .steps {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 2rem 120px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 64px 1fr;
+      gap: 0 32px;
+      margin-bottom: 72px;
+      opacity: 0;
+      transform: translateY(24px);
+      animation: fadeUp 0.5s ease forwards;
+    }
+
+    .step:nth-child(1) { animation-delay: 0.1s; }
+    .step:nth-child(2) { animation-delay: 0.2s; }
+    .step:nth-child(3) { animation-delay: 0.3s; }
+    .step:nth-child(4) { animation-delay: 0.4s; }
+    .step:nth-child(5) { animation-delay: 0.5s; }
+    .step:nth-child(6) { animation-delay: 0.6s; }
+    .step:nth-child(7) { animation-delay: 0.7s; }
+    .step:nth-child(8) { animation-delay: 0.8s; }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .step-num {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 4px;
+    }
+
+    .step-num .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.7rem;
+      color: var(--amber);
+      background: rgba(245,166,35,0.1);
+      border: 1px solid rgba(245,166,35,0.3);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      flex-shrink: 0;
+    }
+
+    .step-num .line {
+      width: 1px;
+      flex: 1;
+      background: var(--border);
+      margin-top: 12px;
+      min-height: 40px;
+    }
+
+    .step:last-child .step-num .line { display: none; }
+
+    .step-content { min-width: 0; }
+
+    .step-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.01em;
+      margin-bottom: 8px;
+      line-height: 1.3;
+    }
+
+    .step-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 20px;
+    }
+
+    .step-desc strong { color: var(--text); }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      position: relative;
+    }
+
+    .code-block + .code-block { margin-top: -8px; }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .code-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    .copy-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      padding: 3px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.05em;
+    }
+
+    .copy-btn:hover {
+      color: var(--amber);
+      border-color: rgba(245,166,35,0.4);
+    }
+
+    .copy-btn.copied {
+      color: var(--green);
+      border-color: rgba(57,211,83,0.4);
+    }
+
+    pre {
+      padding: 18px 20px;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+    }
+
+    code { font-family: inherit; }
+
+    /* Syntax tokens */
+    .t-cmd { color: #e8e8e8; }
+    .t-flag { color: var(--blue); }
+    .t-val  { color: #ce9178; }
+    .t-comment { color: #555; font-style: italic; }
+    .t-highlight { color: var(--amber); }
+    .t-green { color: var(--green); }
+
+    /* Tip/Note callout */
+    .callout {
+      background: rgba(245,166,35,0.05);
+      border: 1px solid rgba(245,166,35,0.2);
+      border-left: 3px solid var(--amber);
+      border-radius: 0 6px 6px 0;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    .callout strong {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--amber);
+      font-size: 0.7rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .callout.info {
+      background: rgba(88,166,255,0.05);
+      border-color: rgba(88,166,255,0.2);
+      border-left-color: var(--blue);
+    }
+    .callout.info strong { color: var(--blue); }
+
+    /* Image placeholder */
+    .img-placeholder {
+      background: var(--surface2);
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* Tags */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      padding: 3px 10px;
+      border-radius: 3px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .tag-req {
+      background: rgba(255,95,87,0.1);
+      border: 1px solid rgba(255,95,87,0.25);
+      color: var(--red);
+    }
+
+    .tag-opt {
+      background: rgba(88,166,255,0.1);
+      border: 1px solid rgba(88,166,255,0.25);
+      color: var(--blue);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 32px 2rem;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .step { grid-template-columns: 44px 1fr; gap: 0 20px; }
+      h1 { font-size: 2rem; }
+      .hero-meta { flex-direction: column; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="glow-orb"></div>
+<div class="progress-bar" id="progress"></div>
+
+<header>
+  <div class="header-inner">
+    <a class="logo" href="#"><span>~/</span>proxmox-install</a>
+    <span class="badge">VE 8.x</span>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="hero-eyebrow">Installation Guide</div>
+    <h1>Install <span class="accent">Proxmox VE</span><br/>from scratch</h1>
+    <p class="hero-desc">Bare-metal hypervisor setup in under 20 minutes. Follow the steps below — each section includes the exact commands you need.</p>
+    <div class="hero-meta">
+      <div><strong>8 steps</strong> total</div>
+      <div><strong>~15 min</strong> setup time</div>
+      <div><strong>Proxmox VE</strong> 8.x</div>
+    </div>
+  </section>
+
+  <div class="divider"><hr/></div>
+
+  <section class="steps">
+
+    <!-- Step 1 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">01</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Download the ISO</h2>
+        <p class="step-desc">Grab the latest Proxmox VE ISO from the official site. You'll need a <strong>USB drive (≥2GB)</strong> or a tool like Balena Etcher / Rufus to flash it.</p>
+        <div class="tags">
+          <span class="tag tag-req">required</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">bash</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><code><span class="t-comment"># Download via wget (or grab from https://www.proxmox.com/downloads)</span>
+<span class="t-cmd">wget</span> <span class="t-val">https://enterprise.proxmox.com/iso/proxmox-ve_8.2-1.iso</span></code></pre>
+        </div>
+        <div class="callout">
+          <strong>Tip</strong>
+          Flash the ISO with: <code>dd if=proxmox-ve_8.2-1.iso of=/dev/sdX bs=1M status=progress</code> — replace <code>/dev/sdX</code> with your USB drive.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">02</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Boot from USB</h2>
+        <p class="step-desc">Insert the USB into your target machine. Enter the BIOS/UEFI boot menu (usually <strong>F2, F11, F12 or DEL</strong>) and boot from the USB drive.</p>
+        <div class="callout info">
+          <strong>Note</strong>
+          Make sure <strong>Virtualization (VT-x / AMD-V)</strong> is enabled in BIOS. Proxmox requires hardware virtualization support.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">03</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Run the Installer</h2>
+        <p class="step-desc">Select <strong>"Install Proxmox VE (Graphical)"</strong> from the boot menu. Accept the EULA and choose your <strong>target disk</strong> for installation.</p>
+        <div class="callout">
+          <strong>Warning</strong>
+          The target disk will be <strong>wiped</strong>. Pick the right drive. ZFS RAID options are available here if you have multiple disks.
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">04</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Set Location & Timezone</h2>
+        <p class="step-desc">Choose your country, timezone, and keyboard layout. These affect locale settings and the system clock.</p>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">05</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Set root Password & Email</h2>
+        <p class="step-desc">Enter a <strong>strong root password</strong> — this is your admin password for the web UI and SSH. Email is used for cluster alerts (optional but recommended).</p>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">06</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Configure Network</h2>
+        <p class="step-desc">Set your <strong>hostname</strong>, <strong>IP address</strong>, <strong>gateway</strong>, and <strong>DNS</strong>. Use a static IP — you don't want Proxmox's address changing.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">example values</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><code><span class="t-highlight">Hostname:</span>    <span class="t-val">pve.local</span>
+<span class="t-highlight">IP Address:</span>  <span class="t-val">192.168.1.100/24</span>
+<span class="t-highlight">Gateway:</span>     <span class="t-val">192.168.1.1</span>
+<span class="t-highlight">DNS:</span>         <span class="t-val">1.1.1.1</span></code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">07</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Install & Reboot</h2>
+        <p class="step-desc">Review the summary and click <strong>Install</strong>. The process takes 3–5 minutes. Remove the USB when prompted, then reboot.</p>
+        <div class="callout">
+          <strong>Tip</strong>
+          After reboot you'll see the console with the web UI address. Open it in your browser: <code>https://&lt;IP&gt;:8006</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 8 -->
+    <div class="step">
+      <div class="step-num">
+        <div class="num">08</div>
+        <div class="line"></div>
+      </div>
+      <div class="step-content">
+        <h2 class="step-title">Post-Install Setup</h2>
+        <p class="step-desc">Log into the web UI at <code>https://&lt;IP&gt;:8006</code> as <strong>root</strong>. Run these commands over SSH to disable the subscription nag and update the system.</p>
+        <div class="tags">
+          <span class="tag tag-opt">recommended</span>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">ssh — disable nag &amp; update</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><code><span class="t-comment"># Disable enterprise repo (requires subscription)</span>
+<span class="t-cmd">sed</span> <span class="t-flag">-i</span> <span class="t-val">'s/^deb/#deb/'</span> /etc/apt/sources.list.d/pve-enterprise.list
+
+<span class="t-comment"># Add free community repo</span>
+<span class="t-cmd">echo</span> <span class="t-val">"deb http://download.proxmox.com/debian/pve bookworm pve-no-subscription"</span> \
+  > /etc/apt/sources.list.d/pve-community.list
+
+<span class="t-comment"># Update system</span>
+<span class="t-cmd">apt-get update</span> && <span class="t-cmd">apt-get</span> <span class="t-flag">-y</span> upgrade</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-label">bash — remove subscription nag popup</span>
+            <button class="copy-btn" onclick="copyCode(this)">copy</button>
+          </div>
+          <pre><code><span class="t-cmd">sed</span> <span class="t-flag">-Ezi.bak</span> <span class="t-val">"s/(Ext.Msg.show\(\{[\s\S]*?title: gettext\('No valid sub)/void(\1/g"</span> \
+  /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+
+<span class="t-comment"># Restart the web service</span>
+<span class="t-cmd">systemctl restart</span> pveproxy</code></pre>
+        </div>
+        <div class="callout info">
+          <strong>Done</strong>
+          Proxmox VE is ready. Access the dashboard at <span class="t-green">https://&lt;your-ip&gt;:8006</span> and start creating VMs and containers.
+        </div>
+      </div>
+    </div>
+
+  </section>
+</main>
+
+<footer>
+  proxmoxinstall.gentjusufi01.xyz &mdash; Proxmox VE 8.x installation guide
+</footer>
+
+<script>
+  // Progress bar
+  window.addEventListener('scroll', () => {
+    const doc = document.documentElement;
+    const scrolled = doc.scrollTop;
+    const total = doc.scrollHeight - doc.clientHeight;
+    document.getElementById('progress').style.width = (scrolled / total * 100) + '%';
+  });
+
+  // Copy button
+  function copyCode(btn) {
+    const pre = btn.closest('.code-block').querySelector('pre');
+    const text = pre.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = 'copy';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+</script>
+</body>
+</html>
